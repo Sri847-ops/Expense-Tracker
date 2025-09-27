@@ -9,19 +9,19 @@
 </div>
 
 {% if categories and amounts %}
-<div class="row">
+<div class="row mb-4">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Expenses by Category</h5>
+                <h5 class="card-title mb-0">Monthly Expenses Trend</h5>
             </div>
             <div class="card-body">
-                <div id="chartContainer" style="position: relative; height: 400px;">
-                    <canvas id="expenseChart"></canvas>
+                <div id="lineChartContainer" style="position: relative; height: 400px;">
+                    <canvas id="monthlyChart"></canvas>
                 </div>
-                <div id="chartError" class="text-center text-muted" style="display: none;">
+                <div id="lineChartError" class="text-center text-muted" style="display: none;">
                     <i class="bi bi-exclamation-triangle"></i>
-                    <p>Unable to load chart. Please check the console for errors.</p>
+                    <p>Unable to load monthly chart. Please check the console for errors.</p>
                 </div>
             </div>
         </div>
@@ -42,6 +42,40 @@
         </div>
     </div>
 </div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Expenses by Category</h5>
+            </div>
+            <div class="card-body">
+                <div id="chartContainer" style="position: relative; height: 400px;">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+                <div id="chartError" class="text-center text-muted" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p>Unable to load chart. Please check the console for errors.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Monthly Summary</h5>
+            </div>
+            <div class="card-body">
+                {% for month, amount in monthly_data %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-success me-2">{{ month }}</span>
+                    <span class="fw-bold">${{ "%.2f"|format(amount) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
 {% else %}
 <div class="text-center py-5">
     <h4 class="text-muted">No expenses found</h4>
@@ -55,9 +89,102 @@
 // Debug: Log data to console
 console.log('Categories:', {{ categories | tojson }});
 console.log('Amounts:', {{ amounts | tojson }});
+console.log('Monthly Labels:', {{ monthly_labels | tojson }});
+console.log('Monthly Amounts:', {{ monthly_amounts | tojson }});
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Create Monthly Line Chart
+    const monthlyCtx = document.getElementById('monthlyChart');
+    const monthlyErrorDiv = document.getElementById('lineChartError');
+    
+    if (monthlyCtx) {
+        try {
+            const monthlyChart = new Chart(monthlyCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ monthly_labels | tojson }},
+                    datasets: [{
+                        label: 'Monthly Expenses',
+                        data: {{ monthly_amounts | tojson }},
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Total: $' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(0);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            top: 20,
+                            bottom: 20,
+                            left: 20,
+                            right: 20
+                        }
+                    }
+                }
+            });
+            
+            console.log('Monthly chart created successfully:', monthlyChart);
+            if (monthlyErrorDiv) monthlyErrorDiv.style.display = 'none';
+            
+        } catch (error) {
+            console.error('Error creating monthly chart:', error);
+            if (monthlyErrorDiv) monthlyErrorDiv.style.display = 'block';
+        }
+    }
+    
+    // Create Pie Chart
     const ctx = document.getElementById('expenseChart');
     const errorDiv = document.getElementById('chartError');
     
@@ -67,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    console.log('Creating chart with data:', {{ categories | tojson }}, {{ amounts | tojson }});
+    console.log('Creating pie chart with data:', {{ categories | tojson }}, {{ amounts | tojson }});
     
     try {
         const expenseChart = new Chart(ctx, {
@@ -135,13 +262,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        console.log('Chart created successfully:', expenseChart);
+        console.log('Pie chart created successfully:', expenseChart);
         
         // Hide error message if chart loads successfully
         if (errorDiv) errorDiv.style.display = 'none';
         
     } catch (error) {
-        console.error('Error creating chart:', error);
+        console.error('Error creating pie chart:', error);
         if (errorDiv) errorDiv.style.display = 'block';
     }
 });

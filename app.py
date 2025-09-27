@@ -89,14 +89,34 @@ def delete_expense(expense_id):
 @app.route('/report')
 def report():
     conn = get_db_connection()
-    data = conn.execute("SELECT category, SUM(amount) as total FROM expenses GROUP BY category").fetchall()
+    
+    # Get category data for pie chart
+    category_data = conn.execute("SELECT category, SUM(amount) as total FROM expenses GROUP BY category").fetchall()
     total_expenses = conn.execute("SELECT SUM(amount) FROM expenses").fetchone()[0] or 0
+    
+    # Get monthly data for line chart
+    monthly_data = conn.execute("""
+        SELECT strftime('%Y-%m', date) as month, SUM(amount) as total 
+        FROM expenses 
+        GROUP BY strftime('%Y-%m', date) 
+        ORDER BY month
+    """).fetchall()
+    
     conn.close()
     
-    categories = [row['category'] for row in data]
-    amounts = [row['total'] for row in data]
+    categories = [row['category'] for row in category_data]
+    amounts = [row['total'] for row in category_data]
     
-    return render_template('report.html', categories=categories, amounts=amounts, total=total_expenses)
+    monthly_labels = [row['month'] for row in monthly_data]
+    monthly_amounts = [row['total'] for row in monthly_data]
+    
+    return render_template('report.html', 
+                         categories=categories, 
+                         amounts=amounts, 
+                         total=total_expenses,
+                         monthly_labels=monthly_labels,
+                         monthly_amounts=monthly_amounts,
+                         monthly_data=monthly_data)
 
 if __name__ == '__main__':
     app.run(debug=True)

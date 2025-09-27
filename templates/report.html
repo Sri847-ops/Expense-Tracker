@@ -1,33 +1,158 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="mb-4">Expense Report</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Expense Report</h2>
+    <div class="alert alert-info mb-0">
+        <strong>Total Expenses: ${{ "%.2f"|format(total) }}</strong>
+    </div>
+</div>
 
-<canvas id="expenseChart" width="400" height="200"></canvas>
+{% if categories and amounts %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Expenses by Category</h5>
+            </div>
+            <div class="card-body">
+                <div id="chartContainer" style="position: relative; height: 400px;">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+                <div id="chartError" class="text-center text-muted" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p>Unable to load chart. Please check the console for errors.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Category Breakdown</h5>
+            </div>
+            <div class="card-body">
+                {% for i in range(categories|length) %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-primary me-2">{{ categories[i] }}</span>
+                    <span class="fw-bold">${{ "%.2f"|format(amounts[i]) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <h4 class="text-muted">No expenses found</h4>
+    <p class="text-muted">Add some expenses to see the report!</p>
+    <a href="/add" class="btn btn-primary">Add Expense</a>
+</div>
+{% endif %}
 
 <script>
-const ctx = document.getElementById('expenseChart').getContext('2d');
-const expenseChart = new Chart(ctx, {
-    type: 'pie',
-    data: {
-        labels: {{ categories | tojson }},
-        datasets: [{
-            label: 'Expenses by Category',
-            data: {{ amounts | tojson }},
-            backgroundColor: [
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(153, 102, 255, 0.7)'
-            ],
-            borderColor: 'rgba(255, 255, 255, 1)',
-            borderWidth: 1
-        }]
-    },
-    options: {
-        responsive: true
+{% if categories and amounts %}
+// Debug: Log data to console
+console.log('Categories:', {{ categories | tojson }});
+console.log('Amounts:', {{ amounts | tojson }});
+
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('expenseChart');
+    const errorDiv = document.getElementById('chartError');
+    
+    if (!ctx) {
+        console.error('Canvas element not found!');
+        if (errorDiv) errorDiv.style.display = 'block';
+        return;
+    }
+    
+    console.log('Creating chart with data:', {{ categories | tojson }}, {{ amounts | tojson }});
+    
+    try {
+        const expenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: {{ categories | tojson }},
+                datasets: [{
+                    label: 'Expenses by Category',
+                    data: {{ amounts | tojson }},
+                    backgroundColor: [
+                        '#FF6384',
+                        '#36A2EB', 
+                        '#FFCE56',
+                        '#4BC0C0',
+                        '#9966FF',
+                        '#FF9F40',
+                        '#C9C9C9',
+                        '#5366FF',
+                        '#FF6B6B',
+                        '#4ECDC4'
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white',
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': $' + context.parsed.toFixed(2) + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                layout: {
+                    padding: {
+                        top: 20,
+                        bottom: 20,
+                        left: 20,
+                        right: 20
+                    }
+                }
+            }
+        });
+        
+        console.log('Chart created successfully:', expenseChart);
+        
+        // Hide error message if chart loads successfully
+        if (errorDiv) errorDiv.style.display = 'none';
+        
+    } catch (error) {
+        console.error('Error creating chart:', error);
+        if (errorDiv) errorDiv.style.display = 'block';
     }
 });
+{% else %}
+console.log('No data available for chart');
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('expenseChart');
+    if (ctx) {
+        ctx.style.display = 'none';
+    }
+});
+{% endif %}
 </script>
 {% endblock %}
